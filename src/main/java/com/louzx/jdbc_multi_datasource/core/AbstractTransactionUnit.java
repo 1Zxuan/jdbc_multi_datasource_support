@@ -1,7 +1,8 @@
-package com.louzx.jdbc_multi_datasource.utils;
+package com.louzx.jdbc_multi_datasource.core;
 
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.DefaultTransactionDefinition;
 
@@ -15,24 +16,28 @@ import java.util.List;
  */
 abstract class AbstractTransactionUnit {
 
-    protected PlatformTransactionManager platformTransactionManager;
-    protected TransactionStatus transactionStatus;
+    PlatformTransactionManager platformTransactionManager;
     List<String> sql;
+    private TransactionDefinition transactionDefinition;
+    private TransactionStatus transactionStatus;
     private DataSource dataSource;
 
-    AbstractTransactionUnit(List<String> sql, DataSource dataSource) {
+    public AbstractTransactionUnit(PlatformTransactionManager platformTransactionManager, List<String> sql, TransactionDefinition transactionDefinition, DataSource dataSource) {
+        this.platformTransactionManager = platformTransactionManager;
         this.sql = sql;
+        this.transactionDefinition = transactionDefinition;
         this.dataSource = dataSource;
     }
 
     void begin() throws SQLException {
-        if (null == dataSource) {
-            throw new SQLException("数据源为空");
-        }
         if (null == platformTransactionManager) {
+            if (null == dataSource) {
+                throw new SQLException("数据源为空");
+            }
             platformTransactionManager = new DataSourceTransactionManager(dataSource);
         }
-        transactionStatus = platformTransactionManager.getTransaction(new DefaultTransactionDefinition());
+
+        transactionStatus = null == transactionDefinition ? platformTransactionManager.getTransaction(new DefaultTransactionDefinition()) : platformTransactionManager.getTransaction(new DefaultTransactionDefinition(transactionDefinition));
 
     }
 
@@ -46,7 +51,8 @@ abstract class AbstractTransactionUnit {
                 platformTransactionManager.rollback(transactionStatus);
             }
         }
-        platformTransactionManager = null;
-        transactionStatus = null;
-    };
+        if (null != dataSource) {
+            platformTransactionManager = null;
+        }
+    }
 }
